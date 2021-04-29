@@ -1,0 +1,8 @@
+This program uses parts which are under different licences.
+
+This program CPfilemgr by SnailMath is open source, you can edit and redistribute it as long as there is the information that it was originally written by me.
+
+The file div.s contains a few functions needed by gcc which are taken from the Arch linux project and which were written by Steve Chamberlain.
+
+This project uses stb_image.h which you need to download yourself and place it into this folder. stb_image.h is in the public domain and under the mit licence. 
+stb_image.h was ritten by Sean Barrett
