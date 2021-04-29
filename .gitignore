@@ -2,3 +2,6 @@
 *.o
 *.hhk
 *.bin
+calc_image.h
+stb_image.h
+stb_image.h_orig
