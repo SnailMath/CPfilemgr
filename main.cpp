@@ -6,11 +6,12 @@
 #include <sdk/os/debug.hpp>
 #include <sdk/os/mem.hpp>
 #include <sdk/os/input.hpp>
+#include <sdk/os/serial.hpp>
 
 APP_NAME("Filemgr")
 APP_DESCRIPTION("A simple file manager")
 APP_AUTHOR("SnailMath")
-APP_VERSION("1.0.0")
+APP_VERSION("1.0.1")
 
 typedef unsigned int size_t;
 int abs(int a);
@@ -51,11 +52,14 @@ struct dirEntry directory[64];
 char g_path[400];
 wchar_t g_wpath[400];
 
+void wav_DrawDiagram();
+
 void fileClick(char* fileName);
 void showImage(char* fileName);
 void show565(char* fileName);
 void showText(char* fileName);
 void showHex(char* fileName);
+void playWav(char* fileName);
 
 
 #define to_ch(x) numToAscii[addr[x]]
@@ -282,6 +286,7 @@ void fileClick(char* fileName){
 	Debug_Printf(3,4,false,0,"2 - as text file");
 	Debug_Printf(3,5,false,0,"3 - as image file (png/jpg/gif)");
 	Debug_Printf(3,6,false,0,"4 - as image file (.565)");
+	Debug_Printf(3,7,false,0,"5 - as .wav sound file (8bit mono 11kHz)");
 	LCD_Refresh();
 
 	int selection = getCommandInput();
@@ -293,6 +298,8 @@ void fileClick(char* fileName){
 		showImage(fileName);
 	}else if (selection==4){
 		show565(fileName);
+	}else if (selection==5){
+		playWav(fileName);
 	}
 }
 void showImage(char* fileName){
@@ -457,3 +464,96 @@ void show565(char* fileName){
 	Debug_WaitKey();
 }
 
+unsigned char pwm[] = {
+0b00000000,
+0b00000001,
+0b00000011,
+0b00000111,
+0b00001111,
+0b00011111,
+0b00111111,
+0b01111111
+};
+void playWav(char* fileName){
+	LCD_ClearScreen();
+	Debug_Printf(0,0,false,0,"Open file %s",fileName);
+	Debug_Printf(0,1,false,0,"(must be 8bit mono 11kHz)");
+	Debug_Printf(0,2,false,0,"Playing...");
+	Debug_Printf(0,3,false,0,"Press any key to stop.");
+	wav_DrawDiagram();
+	LCD_Refresh();
+	while(Input_IsAnyKeyDown()); //wait until every key is released, so we don't break immidiately
+
+    // open file
+	unsigned char* wav;
+	int fp = open(fileName,OPEN_READ);
+
+	//open serial port in 115200bit ( 1 start bit + 8 bit + 1 stop bit = 10 bit , that means 11520 samples per second )
+	unsigned char mode[6] = {0,9,0,0,0,0};
+	Serial_Open(mode);
+	
+	//send audio
+	uint16_t i = 0x2c; //skip the first 44 bytes (the wav header and assume 8bit mono 11kHz
+	int j=0;
+	while(true){
+		if(getAddr(fp,j*4096,(const void**)&wav)){ //get the address of the next 4k block
+			break; //when there is an error getting the addr just break.
+		}
+		while(i<4096){ //send every byte in each 4k block
+			unsigned char sample = pwm[wav[i]>>(8-3)];//just use the most significant 3 bytes.
+			while(Serial_WriteUnbuffered(sample)); //try to send it until it goes through.
+			i++; //next byte
+		}
+		i=0; //reset i (to start the at the beginning of the next block)
+		j++; //next block
+
+		//check if clear is pressed
+		if(Input_IsAnyKeyDown()){
+		//InputScancode key = ScancodeClear;
+		//if(Input_GetKeyState(&key)){
+				break;
+		}
+	}
+
+	//close file and serial port
+	close(fp);
+	while(Serial_Close(0));//try to close it until it works (returns 5 if still transmitting)
+
+	//if the file is not a multiple of 4k we just play until the end of the last block. just
+	//a little bit of noise at the end of the file...
+	
+	//wait until every key is released, so we don't exit immidiately
+	while(Input_IsAnyKeyDown()); 
+}
+
+void wav_DrawDiagram(){ //draw the connection diagram:
+/*
+ *  DC filter and 3 stages 6.7kHz low pass filter (for the 10lHz noise from the serial port)
+ *
+ *  2.5mm Port           C=100nF R=2x470 in parallel     Amplifier
+ *                | |
+ *	   Tip -------| |---/\/\/\--+--/\/\/\--+--/\/\/\--+----- AUX
+ *                | |           |          |          |
+ *	  Ring ---                 ---        ---        ---
+ *                             ---        ---        ---
+ *                              |          |          |
+ *	Sleeve ---------------------+----------+----------+----- GND
+ *
+ */
+
+Debug_Printf( 1, 7,false,0, "DC filter and 2 or 3 stages 6.7kHz low pass filter");
+Debug_Printf( 1, 8,false,0, "(for the 10kHz noise from the serial port)"        );
+Debug_Printf( 1, 9,false,0, "(C=100nF R=2x470 in parallel)"           );
+
+Debug_Printf( 1,11,false,0, "2.5mm Port"                                        );
+Debug_Printf(41,11,false,0,                                         "Amplifier" );
+
+Debug_Printf(15,13,false,0,               "| |    ____       ____"              );
+Debug_Printf( 4,14,false,0,    "Tip -------| |---|____|--+--|____|--+----- AUX" );
+Debug_Printf(15,15,false,0,               "| |           |          |"          );
+Debug_Printf( 3,16,false,0,   "Ring ---                -----      -----"        );
+Debug_Printf(27,17,false,0,                           "-----      -----"        );
+Debug_Printf(29,18,false,0,                             "|          |"          );
+Debug_Printf( 1,19,false,0, "Sleeve ---------------------+----------+----- GND" );
+ 
+}
