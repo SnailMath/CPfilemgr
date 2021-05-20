@@ -11,7 +11,7 @@
 APP_NAME("Filemgr")
 APP_DESCRIPTION("A simple file manager")
 APP_AUTHOR("SnailMath")
-APP_VERSION("1.0.1")
+APP_VERSION("1.0.2")
 
 typedef unsigned int size_t;
 int abs(int a);
@@ -275,7 +275,7 @@ void stbi_my_skip(void *user,int n){
 	lseek((int) user, n, SEEK_CUR);
 }
 int  stbi_my_eof (void *user){
-return 0;
+	return 0; //Someone's been very sloppy here...
 }
 
 //Open a file and display it when it was clicked.
@@ -284,7 +284,7 @@ void fileClick(char* fileName){
 	Debug_Printf(3,2,false,0,"Open file '%s'",fileName);
 	Debug_Printf(3,3,false,0,"1 - as binary file");
 	Debug_Printf(3,4,false,0,"2 - as text file");
-	Debug_Printf(3,5,false,0,"3 - as image file (png/jpg/gif)");
+	Debug_Printf(3,5,false,0,"3 - as image file (png/jpg/gif) 320x528px");
 	Debug_Printf(3,6,false,0,"4 - as image file (.565)");
 	Debug_Printf(3,7,false,0,"5 - as .wav sound file (8bit mono 11kHz)");
 	LCD_Refresh();
@@ -322,6 +322,7 @@ void showImage(char* fileName){
 
 	uint32_t pos = 0;
 	for(int y=h-1;y>=0;y--){
+	//for(int y=0;y<h;y++){
 		for(int x=0;x<w;x++){
 			unsigned char r = img[pos++];
 			unsigned char g = img[pos++];
